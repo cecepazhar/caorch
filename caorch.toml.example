@@ -1,0 +1,39 @@
+# CAOrch Configuration Example
+# Location: ~/.caorch/caorch.toml
+
+[daemon]
+interval_secs = 60
+retry_threshold = 3
+log_dir = "~/.caorch"
+ssh_key_path = "~/.ssh/id_ed25519"
+
+[alerts]
+telegram_chat_id = "YOUR_CHAT_ID"
+telegram_bot_token = "YOUR_BOT_TOKEN"
+
+[nodes.ypc]
+ip = "100.127.232.32"
+user = "cecep"
+services = [
+  { name = "gitea", port = 3000, protocol = "tcp" },
+  { name = "nextcloud", port = 443, protocol = "tcp" },
+  { name = "tailscaled", port = 22, protocol = "tcp" }
+]
+
+[nodes.hostinger]
+ip = "100.76.150.46"
+user = "root"
+services = [
+  { name = "tailscale-funnel", port = 8443, protocol = "tcp" }
+]
+
+[nodes.gcc]
+ip = "GCC_IP"
+user = "root"
+services = [
+  { name = "dokploy", port = 8080, protocol = "tcp" }
+]
+
+[remediation]
+"ypc.gitea" = "podman restart gitea"
+"hostinger.tailscale-funnel" = "systemctl restart cloudflared"
