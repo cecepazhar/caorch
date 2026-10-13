@@ -9,6 +9,9 @@ license.workspace = true
 name = "caorch"
 path = "src/main.rs"
 
+[[bin]]
+name = "cao"
+path = "src/main.rs"
 
 [dependencies]
 tokio.workspace = true
