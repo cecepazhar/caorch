@@ -12,5 +12,5 @@ serde_json.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 colored.workspace = true
-caorch-core = {{ path = "../core" }}
-caorch-config = {{ path = "../config" }}
+caorch-core = { path = "../core" }
+caorch-config = { path = "../config" }

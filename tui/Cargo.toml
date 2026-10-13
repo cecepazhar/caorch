@@ -13,5 +13,5 @@ thiserror.workspace = true
 anyhow.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
-caorch-core = {{ path = "../core" }}
-caorch-config = {{ path = "../config" }}
+caorch-core = { path = "../core" }
+caorch-config = { path = "../config" }
