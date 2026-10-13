@@ -9,9 +9,6 @@ license.workspace = true
 name = "caorch"
 path = "src/main.rs"
 
-[[bin]]
-name = "cao"
-path = "src/main.rs"
 
 [dependencies]
 tokio.workspace = true
@@ -23,3 +20,6 @@ clap.workspace = true
 colored.workspace = true
 caorch-core = { path = "../core" }
 caorch-config = { path = "../config" }
+caorch-daemon = { path = "../daemon" }
+caorch-tui = { path = "../tui" }
+

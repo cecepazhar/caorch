@@ -5,6 +5,14 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[lib]
+name = "caorch_tui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "caorch-tui"
+path = "src/main.rs"
+
 [dependencies]
 tokio.workspace = true
 serde.workspace = true

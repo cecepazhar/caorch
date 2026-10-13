@@ -1,5 +1,118 @@
-//! CAOrch core module
+use tokio::time::Instant;
 
-pub fn init() {
-    println!("CAOrch core initialized.");
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProbeStatus {
+    Up,
+    Down,
+    Timeout,
+}
+
+pub struct ProbeResult {
+    pub status: ProbeStatus,
+    pub latency_ms: Option<u128>,
+}
+
+/// TCP connect probe.
+pub async fn probe_service(host: &str, port: u16, timeout_ms: u64) -> ProbeResult {
+    let addr = format!("{host}:{port}");
+    let start = Instant::now();
+    let outcome = tokio::time::timeout(
+        std::time::Duration::from_millis(timeout_ms),
+        tokio::net::TcpStream::connect(&addr),
+    )
+    .await;
+    match outcome {
+        Ok(Ok(_)) => ProbeResult {
+            status: ProbeStatus::Up,
+            latency_ms: Some(start.elapsed().as_millis()),
+        },
+        Ok(Err(_)) => ProbeResult {
+            status: ProbeStatus::Down,
+            latency_ms: None,
+        },
+        Err(_) => ProbeResult {
+            status: ProbeStatus::Timeout,
+            latency_ms: None,
+        },
+    }
+}
+
+/// Telegram bot API alert.
+pub async fn send_telegram_alert(
+    bot_token: &str,
+    chat_id: &str,
+    text: &str,
+) -> Result<(), String> {
+    let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
+    let client = reqwest::Client::new();
+    let res = client
+        .post(&url)
+        .json(&serde_json::json!({ "chat_id": chat_id, "text": text }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("telegram status {}", res.status()));
+    }
+    Ok(())
+}
+
+/// Execute remote SSH remediation command.
+pub async fn execute_remediation(
+    ssh_key: &str,
+    user: &str,
+    host: &str,
+    cmd: &str,
+) -> Result<String, String> {
+    let out = tokio::process::Command::new("ssh")
+        .arg("-i")
+        .arg(ssh_key)
+        .arg("-o")
+        .arg("StrictHostKeyChecking=no")
+        .arg("-o")
+        .arg("BatchMode=yes")
+        .arg(format!("{user}@{host}"))
+        .arg(cmd)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!(
+            "ssh exit {:?}: {}",
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+/// Pre-check: 1.1.1.1 reachable OR tailscale0 interface up.
+pub async fn gateway_precheck() -> bool {
+    let one_one = probe_service("1.1.1.1", 53, 3000).await.status == ProbeStatus::Up;
+    if one_one {
+        return true;
+    }
+    // ponytail: only checks interface exists; upgrade path: tailscale status JSON check
+    matches!(
+        tokio::process::Command::new("ip").args(["addr", "show", "tailscale0"]).output().await,
+        Ok(o) if o.status.success()
+    )
+}
+
+// ponytail: self-test checks probe statuses work correctly
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn probe_refused_port_down() {
+        let r = probe_service("127.0.0.1", 1, 1000).await;
+        assert_eq!(r.status, ProbeStatus::Down);
+    }
+
+    #[tokio::test]
+    async fn probe_timeout() {
+        let r = probe_service("192.0.2.1", 80, 200).await;
+        assert_eq!(r.status, ProbeStatus::Timeout);
+    }
 }
