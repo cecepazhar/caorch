@@ -3,7 +3,7 @@ members = ["core", "cli", "daemon", "config", "tui"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["Cecep Azhar <hi@cecepazhar.com>"]
@@ -20,3 +20,5 @@ clap = { version = "4", features = ["derive"] }
 colored = "2"
 crossterm = "0.27"
 ratatui = "0.26"
+axum = { version = "0.7", features = [] }
+sysinfo = "0.31"

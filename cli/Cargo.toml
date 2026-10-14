@@ -21,6 +21,7 @@ thiserror.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 colored.workspace = true
+reqwest.workspace = true
 caorch-core = { path = "../core" }
 caorch-config = { path = "../config" }
 caorch-daemon = { path = "../daemon" }

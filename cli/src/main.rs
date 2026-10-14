@@ -1,5 +1,5 @@
 use caorch_config::load_config;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 use tokio::task::JoinSet;
@@ -15,7 +15,7 @@ struct Cli {
     command: Command,
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[derive(Subcommand, Debug)]
 enum Command {
     /// Show live status of all services
     Status,
@@ -28,6 +28,24 @@ enum Command {
     Daemon,
     /// Launch interactive TUI dashboard
     Tui,
+    /// Server management via daemon HTTP API
+    Server {
+        #[command(subcommand)]
+        sub: ServerCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ServerCommand {
+    /// Show system stats (CPU, RAM, Disk) from server
+    Stats,
+    /// List all docker containers
+    Containers,
+    /// Run an action on target (restart, stop, start, backup)
+    Action {
+        action: String,
+        target: String,
+    },
 }
 
 fn expand_home(p: &PathBuf) -> PathBuf {
@@ -53,6 +71,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Restart { node, service } => restart(&config, &node, &service).await?,
         Command::Daemon => daemon::run(&config).await?,
         Command::Tui => tui::run(&config).await?,
+        Command::Server { sub } => server_cmd(&config, sub).await?,
+    }
+    Ok(())
+}
+
+async fn server_cmd(
+    config: &caorch_config::Config,
+    cmd: ServerCommand,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let base = format!("http://127.0.0.1:{}", config.api.port);
+    let client = reqwest::Client::new();
+    let mut req_builder = |method: reqwest::Method, path: &str| {
+        let mut req = client.request(method, format!("{base}{path}"));
+        if !config.api.token.is_empty() {
+            req = req.header("Authorization", format!("Bearer {}", config.api.token));
+        }
+        req
+    };
+
+    match cmd {
+        ServerCommand::Stats => {
+            let res = req_builder(reqwest::Method::GET, "/api/stats")
+                .send()
+                .await?;
+            if !res.status().is_success() {
+                eprintln!("{}: {}", "Error".red(), res.status());
+                std::process::exit(1);
+            }
+            let s: caorch_core::SystemStats = res.json().await?;
+            println!("{}", "SYSTEM STATS".green().bold());
+            println!("{:<14} {:.1}%", "CPU Usage:", s.cpu_pct);
+            println!("{:<14} {} MB / {} MB", "RAM:", s.ram_used_mb, s.ram_total_mb);
+            println!("{:<14} {} GB / {} GB", "Disk:", s.disk_used_gb, s.disk_total_gb);
+        }
+        ServerCommand::Containers => {
+            let res = req_builder(reqwest::Method::GET, "/api/containers")
+                .send()
+                .await?;
+            if !res.status().is_success() {
+                eprintln!("{}: {}", "Error".red(), res.status());
+                std::process::exit(1);
+            }
+            #[derive(serde::Deserialize)]
+            struct Container {
+                name: String,
+                status: String,
+            }
+            let list: Vec<Container> = res.json().await?;
+            let header = format!("{:<30} {:<30}", "CONTAINER", "STATUS");
+            println!("{}", header.green().bold());
+            println!("{}", "-".repeat(62).blue());
+            for c in list {
+                println!("{:<30} {:<30}", c.name, c.status);
+            }
+        }
+        ServerCommand::Action { action, target } => {
+            let res = req_builder(reqwest::Method::POST, "/api/action")
+                .json(&serde_json::json!({ "action": action, "target": target }))
+                .send()
+                .await?;
+            if !res.status().is_success() {
+                eprintln!("{}: {}", "Error".red(), res.status());
+                std::process::exit(1);
+            }
+            #[derive(serde::Deserialize)]
+            struct ActRes {
+                ok: bool,
+                output: String,
+            }
+            let r: ActRes = res.json().await?;
+            if r.ok {
+                println!("{} {}", "SUCCESS:".green().bold(), r.output.trim());
+            } else {
+                println!("{} {}", "FAILED:".red().bold(), r.output.trim());
+            }
+        }
     }
     Ok(())
 }

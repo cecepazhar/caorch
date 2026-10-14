@@ -1,5 +1,42 @@
 use tokio::time::Instant;
 
+use serde::{Deserialize, Serialize};
+use sysinfo::System;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemStats {
+    pub cpu_pct: f32,
+    pub ram_used_mb: u64,
+    pub ram_total_mb: u64,
+    pub disk_used_gb: u64,
+    pub disk_total_gb: u64,
+}
+
+/// Collect CPU, RAM and disk stats via sysinfo.
+pub fn get_system_stats() -> SystemStats {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    // CPU: average across all logical CPUs after a brief refresh
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    sys.refresh_cpu_usage();
+    let cpu_pct = sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>()
+        / sys.cpus().len().max(1) as f32;
+
+    let ram_used_mb = sys.used_memory() / 1024 / 1024;
+    let ram_total_mb = sys.total_memory() / 1024 / 1024;
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let (disk_used, disk_total) = disks.iter().fold((0u64, 0u64), |(u, t), d| {
+        let total = d.total_space();
+        let avail = d.available_space();
+        (u + (total - avail), t + total)
+    });
+    let disk_used_gb = disk_used / 1024 / 1024 / 1024;
+    let disk_total_gb = disk_total / 1024 / 1024 / 1024;
+
+    SystemStats { cpu_pct, ram_used_mb, ram_total_mb, disk_used_gb, disk_total_gb }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProbeStatus {
     Up,

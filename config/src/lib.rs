@@ -17,9 +17,32 @@ pub struct Config {
     pub daemon: DaemonConfig,
     pub alerts: AlertsConfig,
     #[serde(default)]
+    pub api: ApiConfig,
+    #[serde(default)]
     pub nodes: HashMap<String, NodeConfig>,
     #[serde(default)]
     pub remediation: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApiConfig {
+    #[serde(default)]
+    pub token: String,
+    #[serde(default = "default_api_port")]
+    pub port: u16,
+}
+
+fn default_api_port() -> u16 {
+    8090
+}
+
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self {
+            token: String::new(),
+            port: 8090,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
