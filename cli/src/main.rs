@@ -82,7 +82,7 @@ async fn server_cmd(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let base = format!("http://127.0.0.1:{}", config.api.port);
     let client = reqwest::Client::new();
-    let mut req_builder = |method: reqwest::Method, path: &str| {
+    let req_builder = |method: reqwest::Method, path: &str| {
         let mut req = client.request(method, format!("{base}{path}"));
         if !config.api.token.is_empty() {
             req = req.header("Authorization", format!("Bearer {}", config.api.token));
